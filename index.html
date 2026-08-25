@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f7f8fc" />
+    <title>Assembly Room Scheduler</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section class="login-screen" id="login-screen">
+      <div class="login-brand"><div class="brand-mark"><span></span><span></span><span></span></div><div><div class="brand-name">Assembly</div><div class="brand-subtitle">ROOM SCHEDULER</div></div></div>
+      <div class="login-card">
+        <p class="eyebrow">Operations workspace</p>
+        <h1>Welcome back.</h1>
+        <p class="login-copy">Sign in to manage rooms, schedules, accounts, and approvals.</p>
+        <form id="login-form">
+          <label class="form-field"><span class="form-label">Email</span><input class="form-control" id="login-email" type="email" value="admin@assembly.local" autocomplete="username" required /></label>
+          <label class="form-field"><span class="form-label">Password</span><input class="form-control" id="login-password" type="password" value="admin123" autocomplete="current-password" required /></label>
+          <div class="login-error hidden" id="login-error"></div>
+          <button class="button login-submit" type="submit">Sign in <span>→</span></button>
+        </form>
+        <div class="login-hint"><strong>Demo admin account</strong><span>admin@assembly.local · admin123</span></div>
+      </div>
+      <p class="login-footer">SQLite-backed local workspace · Bento Flow</p>
+    </section>
+
+    <div class="app-shell app-hidden" id="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <div class="brand-mark"><span></span><span></span><span></span></div>
+          <div>
+            <div class="brand-name">Assembly</div>
+            <div class="brand-subtitle">ROOM SCHEDULER</div>
+          </div>
+        </div>
+
+        <div class="workspace-switcher">
+          <div class="workspace-icon">M</div>
+          <div class="workspace-copy"><span>Marisol workspace</span><strong>Operations HQ</strong></div>
+          <span class="chevron">⌄</span>
+        </div>
+
+        <div class="nav-label">Workspace</div>
+        <nav class="main-nav" aria-label="Main navigation">
+          <button class="nav-item active" data-view="dashboard"><span class="nav-icon">⌂</span><span>Dashboard</span></button>
+          <button class="nav-item" data-view="rooms"><span class="nav-icon">▦</span><span>Rooms</span><span class="nav-count" id="room-count">5</span></button>
+          <button class="nav-item" data-view="reservations"><span class="nav-icon">▤</span><span>Reservations</span></button>
+          <button class="nav-item" data-view="approvals"><span class="nav-icon">✓</span><span>Approvals</span><span class="nav-count accent" id="approval-count">1</span></button>
+          <button class="nav-item" data-view="requests"><span class="nav-icon">＋</span><span>Request a room</span></button>
+          <button class="nav-item" data-view="reports"><span class="nav-icon">▥</span><span>Daily report</span></button>
+        </nav>
+
+        <div class="nav-label nav-label-bottom">Manage</div>
+        <nav class="main-nav" aria-label="Management navigation">
+          <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>Settings</span></button>
+          <button class="nav-item admin-only" data-view="users"><span class="nav-icon">♙</span><span>Accounts</span></button>
+          <button class="nav-item" data-view="calendar"><span class="nav-icon">▦</span><span>Calendar</span></button>
+          <button class="nav-item" data-view="todo"><span class="nav-icon">☷</span><span>To-do list</span></button>
+          <button class="nav-item" data-view="help"><span class="nav-icon">?</span><span>Help centre</span></button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="support-card">
+            <div class="support-icon">✦</div>
+            <div><strong>Need a hand?</strong><span>Visit the help centre</span></div>
+            <span class="support-arrow">↗</span>
+          </div>
+          <div class="user-card">
+            <div class="avatar avatar-purple">MS</div>
+            <div class="user-copy"><strong>Marisol Santos</strong><span>Administrator</span></div>
+            <button class="more-button" id="logout-button" data-action="logout" aria-label="Sign out">•••</button>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <button class="mobile-menu" id="mobile-menu" aria-label="Open navigation">☰</button>
+          <div class="breadcrumbs"><span>Workspace</span><span class="breadcrumb-divider">/</span><strong id="breadcrumb-title">Dashboard</strong></div>
+          <div class="topbar-actions">
+            <div class="date-chip"><span class="calendar-icon">▣</span><span id="topbar-date">Tuesday, 25 August 2026</span></div>
+            <button class="icon-button" id="notifications-button" aria-label="Notifications"><span class="bell-icon">♢</span><i></i></button>
+            <div class="topbar-avatar avatar avatar-purple" id="topbar-avatar">MS</div>
+          </div>
+        </header>
+
+        <div class="page-content" id="page-content">
+          <!-- Views are rendered here by app.js -->
+        </div>
+      </main>
+    </div>
+
+    <div class="modal-backdrop hidden" id="modal-backdrop">
+      <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"></div>
+    </div>
+
+    <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
