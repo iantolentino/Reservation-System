@@ -453,3 +453,188 @@ textarea.form-control { min-height: 73px; resize: vertical; }
   .calendar-title { min-width: 125px; font-size: 11px; }
   .calendar-toolbar .button.small { padding: 0 8px; }
 }
+
+/* Readability pass: keep the Bento Flow structure while giving text and controls more room. */
+:root {
+  --ink-soft: #263746;
+  --muted: #5f7180;
+  --line: #cbd9e4;
+}
+
+body { color: var(--ink); font-size: 15px; line-height: 1.45; }
+.sidebar { width: 268px; padding: 28px 18px 18px; }
+.brand { gap: 12px; padding: 0 12px 30px; }
+.brand-name { font-size: 17px; }
+.brand-subtitle { font-size: 9px; }
+.workspace-switcher { padding: 12px; }
+.workspace-icon { width: 31px; height: 31px; font-size: 13px; }
+.workspace-copy span { font-size: 10px; }
+.workspace-copy strong { font-size: 12px; }
+.nav-label { padding: 0 13px 11px; font-size: 10px; }
+.nav-item { gap: 13px; padding: 12px 13px; border-radius: 9px; font-size: 14px; line-height: 1.25; }
+.nav-icon { width: 18px; font-size: 18px; }
+.nav-count { min-width: 22px; padding: 3px 7px; font-size: 11px; }
+.support-card { padding: 14px 12px; }
+.support-card strong { font-size: 12px; }
+.support-card span { font-size: 10px; }
+.user-card { gap: 11px; padding-top: 12px; }
+.avatar { width: 34px; height: 34px; font-size: 10px; }
+.user-copy strong { font-size: 12px; }
+.user-copy span { font-size: 10px; }
+.topbar { height: 78px; padding: 0 48px; }
+.breadcrumbs { font-size: 13px; }
+.date-chip { font-size: 12px; }
+.page-content { padding: 44px 48px 68px; }
+.page-heading { margin-bottom: 32px; }
+.eyebrow { margin-bottom: 10px; font-size: 11px; }
+.page-heading h1 { font-size: clamp(28px, 3vw, 38px); letter-spacing: -1.4px; }
+.page-heading p { margin-top: 10px; font-size: 14px; line-height: 1.55; }
+.button { min-height: 42px; padding: 0 16px; border-radius: 9px; font-size: 13px; }
+.button.small { min-height: 36px; padding: 0 12px; font-size: 12px; }
+.metrics-grid { gap: 16px; margin-bottom: 22px; }
+.metric-card { min-height: 145px; padding: 22px; border-radius: 12px; }
+.metric-label { font-size: 12px; }
+.metric-icon { width: 34px; height: 34px; font-size: 16px; }
+.metric-value { margin-top: 20px; font-size: 32px; }
+.metric-note { margin-top: 7px; font-size: 11px; }
+.content-grid { gap: 22px; }
+.panel { border-radius: 12px; }
+.panel-header { padding: 20px 22px; }
+.panel-title { font-size: 16px; }
+.panel-subtitle { margin-top: 6px; font-size: 12px; }
+.panel-link { font-size: 12px; }
+th { padding: 14px 22px; font-size: 11px; letter-spacing: .7px; }
+td { padding: 17px 22px; font-size: 13px; }
+.status-badge { padding: 6px 9px; font-size: 11px; }
+.status-badge::before { width: 6px; height: 6px; }
+.occupancy-body { padding: 22px; }
+.occupancy-score strong { font-size: 34px; }
+.occupancy-score span, .occupancy-note { font-size: 12px; }
+.room-status-list { gap: 18px; margin-top: 26px; }
+.room-status-info strong { font-size: 13px; }
+.room-status-info span, .room-status-row > span:last-child { font-size: 11px; }
+.subnav button { padding: 10px 15px; font-size: 12px; }
+.search-box { width: 280px; }
+.search-box input, .select-control { height: 42px; font-size: 13px; }
+.select-control { padding: 0 12px; }
+.table-action { padding: 6px 8px; font-size: 12px; }
+.room-type, .equipment-list { font-size: 11px; }
+.capacity-pill { padding: 5px 8px; font-size: 11px; }
+.card-grid { gap: 16px; }
+.room-card { padding: 20px; border-radius: 12px; }
+.room-card h3 { font-size: 16px; }
+.room-card-location { margin-top: 18px; font-size: 12px; }
+.room-card-meta, .room-card-equipment { font-size: 11px; }
+.report-config, .settings-card { padding: 22px; }
+.form-grid { gap: 16px; }
+.form-field { gap: 7px; }
+.form-label { font-size: 12px; }
+.form-control { min-height: 42px; padding: 9px 12px; border-radius: 9px; font-size: 13px; }
+textarea.form-control { min-height: 92px; }
+.checkbox-field { font-size: 12px; }
+.report-paper .report-greeting, .report-line, .report-paper .report-date { font-size: 12px; }
+.report-paper h2 { font-size: 19px; }
+.report-room-block h3 { font-size: 13px; }
+.mini-stat span { font-size: 11px; }
+.mini-stat strong { font-size: 24px; }
+.approval-request strong { font-size: 12px; }
+.approval-request span { font-size: 11px; }
+.settings-nav button { padding: 12px 14px; font-size: 12px; }
+.settings-card h2 { font-size: 16px; }
+.settings-card p { font-size: 12px; line-height: 1.55; }
+.toggle-copy strong { font-size: 12px; }
+.toggle-copy span { font-size: 11px; }
+.help-panel h2 { font-size: 21px; }
+.help-panel p { font-size: 13px; }
+.help-step strong { font-size: 12px; }
+.help-step span { font-size: 11px; }
+.modal-header { padding: 24px 25px 19px; }
+.modal-header h2 { font-size: 20px; }
+.modal-header p { font-size: 12px; }
+.modal-body { padding: 22px 25px; }
+.modal-footer { padding: 17px 25px; }
+.conflict-alert, .confirm-copy { font-size: 12px; }
+.modal-notice { font-size: 11px; }
+.toast-copy strong { font-size: 12px; }
+.toast-copy span { font-size: 11px; }
+.quick-actions { gap: 14px; margin-bottom: 22px; }
+.quick-action-card { gap: 12px; padding: 15px 16px; border-radius: 14px; }
+.quick-action-card { min-height: 74px; align-items: flex-start; }
+.quick-action-icon { width: 35px; height: 35px; font-size: 17px; }
+.quick-action-card strong, .quick-action-card small { white-space: normal; }
+.quick-action-card strong { font-size: 13px; line-height: 1.3; }
+.quick-action-card small { margin-top: 4px; font-size: 11px; line-height: 1.35; }
+.quick-action-card > b { align-self: center; flex-shrink: 0; font-size: 18px; }
+.request-filters, .availability-section { padding: 22px; }
+.availability-header h3 { font-size: 16px; }
+.availability-header p { font-size: 11px; }
+.slot-card span { font-size: 12px; }
+.slot-card small { font-size: 10px; }
+.booking-time { font-size: 11px; }
+.booking-list-row strong { font-size: 12px; }
+.booking-list-row small { font-size: 10px; }
+.assignment-badge, .todo-status { font-size: 10px; }
+.todo-row strong { font-size: 12px; }
+.todo-row small { font-size: 11px; }
+.login-card { width: min(100%, 460px); padding: 38px; }
+.login-card h1 { font-size: 34px; }
+.login-copy { font-size: 14px; line-height: 1.6; }
+.login-card .form-field + .form-field { margin-top: 17px; }
+.login-error { font-size: 12px; }
+.login-hint, .login-footer { font-size: 11px; }
+.account-toolbar { margin-bottom: 21px; }
+.account-copy strong { font-size: 13px; }
+.account-copy small { font-size: 11px; }
+.role-pill, .account-delete { font-size: 10px; }
+.calendar-title { font-size: 16px; }
+.calendar-weekdays span { padding: 13px 11px; font-size: 10px; }
+.calendar-day { min-height: 128px; padding: 11px; }
+.calendar-day-number { font-size: 12px; }
+.calendar-day.today .calendar-day-number span:first-child { width: 26px; height: 26px; }
+.calendar-event { padding: 6px 7px; font-size: 10px; line-height: 1.35; }
+.calendar-more, .calendar-help { font-size: 11px; }
+
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid rgba(30, 90, 168, .28);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1120px) {
+  .sidebar { width: 230px; }
+  .topbar, .page-content { padding-left: 30px; padding-right: 30px; }
+}
+
+@media (max-width: 820px) {
+  .sidebar { width: 280px; }
+  .topbar { height: 68px; padding: 0 20px; }
+  .page-content { padding: 30px 20px 50px; }
+  .page-heading h1 { font-size: 32px; }
+  .page-heading p { font-size: 13px; }
+  .panel-header { padding: 18px 20px; }
+  th { padding: 13px 18px; }
+  td { padding: 15px 18px; }
+}
+
+@media (max-width: 570px) {
+  .page-content { padding: 25px 16px 40px; }
+  .page-heading h1 { font-size: 28px; }
+  .page-heading p { font-size: 13px; }
+  .heading-actions { align-items: stretch; flex-direction: column; }
+  .heading-actions .button { width: 100%; }
+  .metrics-grid { gap: 12px; }
+  .metric-card { min-height: 132px; padding: 18px; }
+  .metric-value { margin-top: 14px; font-size: 29px; }
+  .panel-title { font-size: 15px; }
+  .panel-subtitle { font-size: 11px; }
+  .panel-header { gap: 10px; padding: 16px; }
+  th { padding: 12px 15px; font-size: 10px; }
+  td { padding: 14px 15px; font-size: 12px; }
+  .quick-action-card small { white-space: normal; line-height: 1.35; }
+  .calendar-grid { min-height: 480px; }
+  .calendar-day { min-height: 80px; padding: 7px; }
+  .calendar-weekdays span { padding: 10px 4px; font-size: 8px; }
+  .calendar-event { padding: 4px 5px; font-size: 8px; }
+  .calendar-title { min-width: 135px; font-size: 14px; }
+  .login-card { padding: 28px 22px; }
+  .login-card h1 { font-size: 30px; }
+}
