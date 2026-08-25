@@ -1,10 +1,10 @@
 # Assembly Room Scheduler
 
-A browser-ready MVP for the Company Room Reservation System brief.
+A SQLite-backed room reservation system for the Company Room Reservation System brief.
 
 ## Included in this MVP
 
-- Dashboard with today’s reservations, live room occupancy, and approval counts
+- Dashboard with today's reservations, live room occupancy, and approval counts
 - Room management with room cards, approval rules, capacity, status, and equipment
 - Reservation creation with whole-day, onwards, blocked, and time-range bookings
 - Overlap and capacity conflict prevention
@@ -16,16 +16,33 @@ A browser-ready MVP for the Company Room Reservation System brief.
 - Weekly, monthly, and yearly CSV report exports
 - Report email preview placeholder and `.txt` export
 - Reservation list `.csv` export
-- In-app to-do list for the remaining production work
-- Settings for report defaults and notification toggles
-- Local browser persistence through `localStorage`
+- Login page with a seeded administrator account
+- Admin account management with add and delete controls
+- Calendar page with add-schedule entry points
+- SQLite-only persistence through the local Python server
+- Responsive mobile layout
 
 ## Run it
 
-Open `index.html` in a browser, or serve this folder with any static file server. The sample workspace is preloaded from the report in the project brief. Data is stored locally in the browser; use the browser’s site data controls to reset it.
+This version requires the SQLite server. Do not open `index.html` directly or use the GitHub repository page because those do not provide the `/api` endpoints used by login and data storage.
+
+From this folder, run:
+
+```powershell
+python server.py
+```
+
+Then open [http://127.0.0.1:4173/](http://127.0.0.1:4173/) in your browser.
+
+The SQLite database is created automatically at `data/assembly.db`.
+
+Demo administrator:
+
+- Email: `admin@assembly.local`
+- Password: `admin123`
 
 ## Next production steps
 
-Replace the local storage adapter with PostgreSQL/Drizzle, add session authentication, connect SMTP or Microsoft Graph, and add PDF/Excel generation when the workflow is accepted by the team.
+The current server uses only Python's standard library and SQLite. Connect SMTP or Microsoft Graph, add PDF/Excel generation, and add production backup controls when the workflow is accepted by the team.
 
 The current sample room names are placeholders. Replace them with the official meeting room names once they are provided.

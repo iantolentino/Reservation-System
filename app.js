@@ -606,7 +606,10 @@ async function submitLogin(event) {
     if (!response.ok) throw new Error(result.error || "Invalid email or password");
     await loadAppFromSQLite(result.user);
   } catch (loginError) {
-    if (error) { error.textContent = loginError.message; error.classList.remove("hidden"); }
+    const message = loginError?.message === "Failed to fetch"
+      ? "The SQLite server is not running. Start server.py, then open http://127.0.0.1:4173/."
+      : loginError.message;
+    if (error) { error.textContent = message; error.classList.remove("hidden"); }
   } finally {
     if (button) button.disabled = false;
   }
