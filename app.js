@@ -180,7 +180,8 @@ function emptyState(title, copy) {
 }
 
 function pageHeading(eyebrow, title, description, action = "") {
-  return `<div class="page-heading"><div><p class="eyebrow">${escapeHtml(eyebrow)}</p><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p></div>${action ? `<div class="heading-actions">${action}</div>` : ""}</div>`;
+  const resolvedTitle = title === "Good morning, Marisol" ? `Good morning, ${currentUser?.role || "Admin"}` : title;
+  return `<div class="page-heading"><div><p class="eyebrow">${escapeHtml(eyebrow)}</p><h1>${escapeHtml(resolvedTitle)}</h1><p>${escapeHtml(description)}</p></div>${action ? `<div class="heading-actions">${action}</div>` : ""}</div>`;
 }
 
 function render() {
