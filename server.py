@@ -308,6 +308,29 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
         if path == "/api/health":
             self.send_json({"ok": True, "database": str(DB_PATH.name)})
             return
+        if path == "/api/public/bootstrap":
+            with connect() as db:
+                rooms = [
+                    {"id": row["id"], "name": row["name"], "capacity": row["capacity"], "status": row["status"]}
+                    for row in db.execute("SELECT id,name,capacity,status FROM rooms WHERE status = 'Available' ORDER BY name")
+                ]
+                reservations = [
+                    {
+                        "roomId": row["room_id"],
+                        "department": row["department"],
+                        "startDate": row["start_date"],
+                        "endDate": row["end_date"],
+                        "startTime": row["start_time"],
+                        "endTime": row["end_time"],
+                        "status": row["status"],
+                        "assignmentStatus": row["assignment_status"],
+                    }
+                    for row in db.execute(
+                        "SELECT room_id,department,start_date,end_date,start_time,end_time,status,assignment_status FROM reservations WHERE status = 'Approved' AND assignment_status != 'Unassigned' ORDER BY start_date,start_time"
+                    )
+                ]
+            self.send_json({"rooms": rooms, "reservations": reservations})
+            return
         if path == "/api/session":
             user = self.require_user()
             if user:
@@ -337,6 +360,78 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
 
     def api_post(self, path: str) -> None:
         payload = self.read_json()
+        if path == "/api/public/requests":
+            department = str(payload.get("department", "")).strip()
+            requested_by = str(payload.get("requestedBy", "")).strip()
+            purpose = str(payload.get("eventName", "")).strip()
+            room_id = str(payload.get("roomId", "")).strip()
+            booking_date = str(payload.get("date", "")).strip()
+            start_time = str(payload.get("startTime", "")).strip()
+            end_time = str(payload.get("endTime", "")).strip()
+            urgent = payload.get("urgent") is True
+            try:
+                time.strptime(booking_date, "%Y-%m-%d")
+                start_parts = time.strptime(start_time, "%H:%M")
+                end_parts = time.strptime(end_time, "%H:%M")
+                start_minutes = start_parts.tm_hour * 60 + start_parts.tm_min
+                end_minutes = end_parts.tm_hour * 60 + end_parts.tm_min
+                attendees = int(payload.get("attendees", 1))
+            except (ValueError, TypeError):
+                self.send_json({"error": "Enter a valid date, time, and attendee count."}, 400)
+                return
+            if not department or not requested_by or not purpose or not room_id:
+                self.send_json({"error": "Department, name, purpose, and room are required."}, 400)
+                return
+            if start_minutes >= end_minutes:
+                self.send_json({"error": "Choose an end time after the start time."}, 400)
+                return
+            if urgent and end_minutes - start_minutes > 30:
+                self.send_json({"error": "Urgent bookings can be no longer than 30 minutes."}, 400)
+                return
+            if attendees < 1:
+                self.send_json({"error": "At least one attendee is required."}, 400)
+                return
+            with connect() as db:
+                room = db.execute("SELECT id,name,capacity,status FROM rooms WHERE id = ?", (room_id,)).fetchone()
+                if not room or room["status"] != "Available":
+                    self.send_json({"error": "That room is not currently available for requests."}, 400)
+                    return
+                if attendees > room["capacity"]:
+                    self.send_json({"error": "The selected room does not have enough seats."}, 400)
+                    return
+                existing_rows = db.execute(
+                    """
+                    SELECT start_date,end_date,start_time,end_time
+                    FROM reservations
+                    WHERE room_id = ?
+                      AND status NOT IN ('Cancelled','Rejected')
+                      AND assignment_status != 'Unassigned'
+                      AND start_date <= ? AND end_date >= ?
+                    """,
+                    (room_id, booking_date, booking_date),
+                ).fetchall()
+                for existing in existing_rows:
+                    spans_days = existing["start_date"] != existing["end_date"]
+                    if spans_days or (start_minutes < int(existing["end_time"][:2]) * 60 + int(existing["end_time"][3:]) and end_minutes > int(existing["start_time"][:2]) * 60 + int(existing["start_time"][3:])):
+                        self.send_json({"error": "That room is already reserved for part of this time. Choose another time or room."}, 409)
+                        return
+                timestamp = now_iso()
+                reservation_id = "public-" + secrets.token_urlsafe(10)
+                event_name = ("[URGENT · max 30 min] " if urgent else "") + purpose
+                db.execute(
+                    """
+                    INSERT INTO reservations
+                    (id,room_id,reserved_for,event_name,requested_by,department,date,start_date,end_date,start_time,end_time,time_type,attendees,equipment,remarks,status,assignment_status,rejection_reason,auto_unassigned_at,created_at,updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        reservation_id, room_id, department, event_name, requested_by, department, booking_date,
+                        booking_date, booking_date, start_time, end_time, "range", attendees,
+                        "", str(payload.get("remarks", "")).strip(), "Pending", "Assigned", "", None, timestamp, timestamp,
+                    ),
+                )
+            self.send_json({"ok": True, "id": reservation_id}, 201)
+            return
         if path == "/api/login":
             email = str(payload.get("email", "")).strip().lower()
             password = str(payload.get("password", ""))
