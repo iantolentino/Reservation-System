@@ -437,6 +437,7 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json({"error": "At least one attendee is required."}, 400)
                 return
             with connect() as db:
+                db.execute("BEGIN IMMEDIATE")
                 room = db.execute("SELECT id,name,capacity,status FROM rooms WHERE id = ?", (room_id,)).fetchone()
                 if not room or room["status"] != "Available":
                     self.send_json({"error": "That room is not currently available for requests."}, 400)
