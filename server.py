@@ -475,7 +475,6 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
                         "", str(payload.get("remarks", "")).strip(), "Pending", "Assigned", "", None, timestamp, timestamp,
                     ),
                 )
-            with connect() as db:
                 revision = bump_database_revision(db)
             self.send_json({"ok": True, "id": reservation_id, "revision": revision}, 201)
             return
