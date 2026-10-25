@@ -45,6 +45,11 @@ let state = normalizeState(seedData());
 let currentUser = null;
 let users = [];
 let databaseSnapshot = null;
+let serverRevision = 0;
+let liveSyncTimer = null;
+let liveSyncInFlight = false;
+let localSaveInProgress = false;
+let saveQueue = Promise.resolve();
 let calendarCursor = new Date(2026, 7, 1);
 let isAuthenticated = false;
 let currentView = "dashboard";
@@ -98,15 +103,32 @@ function saveState() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     return Promise.resolve({ ok: true, preview: true });
   }
-  return fetch("/api/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rooms: state.rooms, reservations: state.reservations, settings: state.settings }) })
-    .then(response => {
-      if (!response.ok) throw new Error("SQLite save failed");
-      return response.json();
-    })
-    .catch(() => {
-      showToast("Database sync failed", "The server could not save this change to SQLite.", "error");
+  const performSave = async () => {
+    localSaveInProgress = true;
+    try {
+      const response = await fetch("/api/state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rooms: state.rooms, reservations: state.reservations, settings: state.settings, revision: serverRevision })
+      });
+      const result = await response.json();
+      if (response.status === 409) {
+        await refreshLiveState(true);
+        showToast("Schedule changed on another device", "The latest schedule was loaded. Please reapply your change.", "error");
+        return null;
+      }
+      if (!response.ok) throw new Error(result.error || "SQLite save failed");
+      serverRevision = Number(result.revision ?? serverRevision);
+      return result;
+    } catch (error) {
+      showToast("Database sync failed", error.message || "The server could not save this change to SQLite.", "error");
       return null;
-    });
+    } finally {
+      localSaveInProgress = false;
+    }
+  };
+  saveQueue = saveQueue.then(performSave, performSave);
+  return saveQueue;
 }
 
 function escapeHtml(value = "") {
@@ -233,19 +255,80 @@ function applyCurrentUser() {
   if (userRole) userRole.textContent = currentUser?.role || "Administrator";
 }
 
+function liveStateSignature(value) {
+  const sortById = rows => [...(rows || [])].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  const ordered = { rooms: sortById(value.rooms), reservations: sortById(value.reservations), settings: value.settings || {} };
+  return JSON.stringify(ordered, (key, item) => {
+    if (item && typeof item === "object" && !Array.isArray(item)) {
+      return Object.keys(item).sort().reduce((sorted, name) => { sorted[name] = item[name]; return sorted; }, {});
+    }
+    return item;
+  });
+}
+
+async function refreshLiveState(force = false) {
+  if (liveSyncInFlight || !isAuthenticated || (!force && (localSaveInProgress || currentModal))) return;
+  if (document.hidden && !force) return;
+  liveSyncInFlight = true;
+  try {
+    if (DEMO_PREVIEW) {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+      if (stored) {
+        const incoming = normalizeState(stored);
+        if (liveStateSignature(incoming) !== liveStateSignature(state)) {
+          state = incoming;
+          render();
+          showToast("Schedule updated", "Changes from another preview tab are now visible.", "info");
+        }
+      }
+      return;
+    }
+    const response = await fetch("/api/bootstrap", { headers: { "Accept": "application/json" } });
+    if (!response.ok) {
+      if (response.status === 401) showLogin("Your session expired. Sign in again.");
+      return;
+    }
+    const payload = await response.json();
+    serverRevision = Number(payload.revision ?? serverRevision);
+    const incoming = normalizeState(payload);
+    if (liveStateSignature(incoming) !== liveStateSignature(state)) {
+      state = incoming;
+      render();
+      showToast("Schedule updated", "Changes from another user are now visible.", "info");
+    }
+  } catch (_) {
+    // Keep the current schedule visible and retry on the next poll.
+  } finally {
+    liveSyncInFlight = false;
+  }
+}
+
+function startLiveSync() {
+  if (liveSyncTimer) clearInterval(liveSyncTimer);
+  liveSyncTimer = setInterval(() => refreshLiveState(), 3000);
+}
+
+function stopLiveSync() {
+  if (liveSyncTimer) clearInterval(liveSyncTimer);
+  liveSyncTimer = null;
+}
+
 async function loadAppFromSQLite(user) {
   const response = await fetch("/api/bootstrap");
   if (!response.ok) throw new Error("Could not load the SQLite workspace");
   const payload = await response.json();
   currentUser = user || payload.currentUser;
   state = normalizeState(payload);
+  serverRevision = Number(payload.revision || 0);
   isAuthenticated = true;
   $("#login-screen").classList.add("hidden");
   $("#app-shell").classList.remove("app-hidden");
   render();
+  startLiveSync();
 }
 
 function showLogin(message = "") {
+  stopLiveSync();
   isAuthenticated = false;
   currentUser = null;
   $("#login-screen").classList.remove("hidden");
@@ -775,6 +858,7 @@ async function submitLogin(event) {
     $("#login-screen").classList.add("hidden");
     $("#app-shell").classList.remove("app-hidden");
     render();
+    startLiveSync();
     return;
   }
   const error = $("#login-error");
