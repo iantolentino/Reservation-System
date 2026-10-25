@@ -16,8 +16,11 @@ A SQLite-backed room reservation system for the Company Room Reservation System 
 - Weekly, monthly, and yearly CSV report exports
 - Report email preview placeholder and `.txt` export
 - Reservation list `.csv` export
-- Login page with a seeded administrator account
-- Admin account management with add and delete controls
+- Staff login with Super Admin and Admin access
+- Admin account management and personal password changes
+- Super Admin database viewer and editor; Admins can view database records only
+- Public room calendar showing only department and occupied times
+- Public room request form with approval workflow and a 30-minute urgent booking limit
 - Calendar page with add-schedule entry points
 - SQLite-only persistence through the local Python server
 - Responsive mobile layout
@@ -36,13 +39,25 @@ Then open [http://127.0.0.1:4173/](http://127.0.0.1:4173/) in your browser.
 
 The SQLite database is created automatically at `data/assembly.db`.
 
-Demo administrator:
+Initial Super Admin:
 
-- Email: `admin@assembly.local`
-- Password: `admin123`
+- Email: `superadmin@stratastaff.com`
+- Use the password supplied by the system owner, then change it from **Settings → Account security**.
 
-## Next production steps
+## Public booking page
 
-The current server uses only Python's standard library and SQLite. Connect SMTP or Microsoft Graph, add PDF/Excel generation, and add production backup controls when the workflow is accepted by the team.
+Open `/public.html`. Visitors can review confirmed bookings by department and time, then submit room requests for staff approval. Public calendar responses omit requester names, event titles, notes, and attendee details. Urgent bookings are limited to 30 minutes.
+
+## Access roles
+
+- **Super Admin:** Full access, including database record editing and account creation.
+- **Admin:** Full workspace access, including account creation. The database page is read-only.
+- Each account can change its own password from **Settings → Account security**.
+
+## Deployment notes
+
+The Vercel preview is a static UI preview. Its demo data and demo accounts are stored in the current browser only; separate visitors do not share changes. Shared logins, public requests, and SQLite data require the Python server and a persistent database.
+
+For cPanel, verify that the hosting plan supports running this Python server as a persistent application and that the `data` directory is writable and backed up. Uploading only the HTML, CSS, and JavaScript files will not provide login, shared reservations, or public request processing.
 
 The current sample room names are placeholders. Replace them with the official meeting room names once they are provided.
