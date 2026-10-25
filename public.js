@@ -6,6 +6,7 @@
   let selectedDate = iso(today);
   const safe = value => String(value || "").replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char]));
   let month = new Date(today.getFullYear(), today.getMonth(), 1);
+  let monthInitialized = false;
   let data = { rooms: [], reservations: [] };
 
   function previewData() {
@@ -118,8 +119,11 @@
     let refreshed;
     if(preview){
       refreshed=previewData();
-      const first=(refreshed.reservations||[]).find(item=>item.startDate||item.date);
-      if(first){const d=new Date((first.startDate||first.date)+"T00:00:00");month=new Date(d.getFullYear(),d.getMonth(),1);}
+      if(!monthInitialized){
+        const first=(refreshed.reservations||[]).find(item=>item.startDate||item.date);
+        if(first){const date=first.startDate||first.date;const d=new Date(date+"T00:00:00");month=new Date(d.getFullYear(),d.getMonth(),1);selectedDate=date;}
+        monthInitialized=true;
+      }
     } else {
       const response=await fetch("/api/public/bootstrap",{headers:{"Accept":"application/json"}});
       if(!response.ok) throw new Error("Could not load the public room calendar.");
@@ -132,8 +136,8 @@
     }
   }
 
-  document.getElementById("prev-month").addEventListener("click",()=>{month.setMonth(month.getMonth()-1);renderCalendar();});
-  document.getElementById("next-month").addEventListener("click",()=>{month.setMonth(month.getMonth()+1);renderCalendar();});
+  document.getElementById("prev-month").addEventListener("click",()=>{monthInitialized=true;month.setMonth(month.getMonth()-1);renderCalendar();});
+  document.getElementById("next-month").addEventListener("click",()=>{monthInitialized=true;month.setMonth(month.getMonth()+1);renderCalendar();});
   document.getElementById("public-request-form").addEventListener("submit",submitRequest);
   const dateField=document.getElementById("request-date");
   dateField.min=iso(today); dateField.value=iso(today);
