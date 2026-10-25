@@ -44,6 +44,7 @@ const seedData = () => ({
 let state = normalizeState(seedData());
 let currentUser = null;
 let users = [];
+let databaseSnapshot = null;
 let calendarCursor = new Date(2026, 7, 1);
 let isAuthenticated = false;
 let currentView = "dashboard";
@@ -196,11 +197,11 @@ function pageHeading(eyebrow, title, description, action = "") {
 function render() {
   if (!isAuthenticated) return;
   syncExpiredReservations();
-  const views = { dashboard: renderDashboard, rooms: renderRooms, reservations: renderReservations, approvals: renderApprovals, requests: renderRequests, reports: renderReports, settings: renderSettings, calendar: renderCalendar, users: renderUsers, todo: renderTodo, help: renderHelp };
+  const views = { dashboard: renderDashboard, rooms: renderRooms, reservations: renderReservations, approvals: renderApprovals, requests: renderRequests, reports: renderReports, settings: renderSettings, calendar: renderCalendar, users: renderUsers, database: renderDatabase, todo: renderTodo, help: renderHelp };
   page.innerHTML = views[currentView]();
   if (DEMO_PREVIEW) page.insertAdjacentHTML("afterbegin", '<div class="preview-notice"><strong>Vercel preview</strong><span>Demo mode · changes are saved in this browser only.</span></div>');
   $$(".nav-item").forEach(item => item.classList.toggle("active", item.dataset.view === currentView));
-  const titleMap = { requests: "Request a room", reports: "Daily report", calendar: "Calendar", users: "Accounts", todo: "To-do list", help: "Help centre" };
+  const titleMap = { requests: "Request a room", reports: "Daily report", calendar: "Calendar", users: "Accounts", database: "Database", todo: "To-do list", help: "Help centre" };
   const title = titleMap[currentView] || currentView.charAt(0).toUpperCase() + currentView.slice(1);
   $("#breadcrumb-title").textContent = title === "Reports" ? "Daily report" : title;
   $("#room-count").textContent = state.rooms.length;
@@ -211,8 +212,10 @@ function render() {
 }
 
 function applyCurrentUser() {
-  const admin = currentUser?.role === "Admin";
-  $$(".admin-only").forEach(element => { element.style.display = admin ? "" : "none"; });
+  const admin = ["Admin", "Super Admin"].includes(currentUser?.role);
+  const superAdmin = currentUser?.role === "Super Admin";
+  $(".admin-only").forEach(element => { element.style.display = admin ? "" : "none"; });
+  $(".superadmin-only").forEach(element => { element.style.display = superAdmin ? "" : "none"; });
   const avatarText = initials(currentUser?.name || "MS");
   const topAvatar = $("#topbar-avatar");
   if (topAvatar) topAvatar.textContent = avatarText;
@@ -429,8 +432,8 @@ function renderCalendar() {
 }
 
 function renderUsers() {
-  if (currentUser?.role !== "Admin") return pageHeading("Administration", "Accounts", "You do not have permission to manage accounts.") + emptyState("Admin access required", "Ask an administrator to create or manage accounts.");
-  return pageHeading("Administration", "Accounts", "Create accounts with the same full access, or manage the team sign-in details.", '<button class="button" data-action="new-user"><span class="plus">+</span> Add account</button>') +
+  if (!["Admin", "Super Admin"].includes(currentUser?.role)) return pageHeading("Administration", "Accounts", "You do not have permission to manage accounts.") + emptyState("Admin access required", "Ask an administrator to create or manage accounts.");
+  return pageHeading("Administration", "Accounts", "Create Admin accounts with full system access, except database editing.", '<button class="button" data-action="new-user"><span class="plus">+</span> Add account</button>') +
     '<section class="panel view-panel"><div class="panel-header"><div><h2 class="panel-title">Workspace accounts</h2><p class="panel-subtitle">' + users.length + ' account' + (users.length === 1 ? "" : "s") + ' can sign in to this SQLite workspace.</p></div><span class="role-pill admin">Admin access</span></div><div class="account-list">' + (users.length ? users.map(accountRow).join("") : emptyState("Loading accounts", "Fetching the account list from SQLite.")) + '</div></section>';
 }
 
@@ -518,6 +521,7 @@ function navigate(view) {
   $("#sidebar").classList.remove("open");
   render();
   if (view === "users") fetchUsers();
+  if (view === "database") fetchDatabase();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -555,7 +559,7 @@ function handleAction(action, id, roomId, setting, startTime, endTime) {
 }
 
 async function fetchUsers() {
-  if (currentUser?.role !== "Admin") return;
+  if (!["Admin", "Super Admin"].includes(currentUser?.role)) return;
   try {
     const response = await fetch("/api/users");
     if (!response.ok) throw new Error("Account list unavailable");
