@@ -229,9 +229,25 @@ def reservation_from_row(row: sqlite3.Row) -> dict:
     }
 
 
+def database_revision(db: sqlite3.Connection) -> int:
+    row = db.execute("SELECT setting_value FROM settings WHERE setting_key = ?", ("__revision",)).fetchone()
+    if not row:
+        return 0
+    try:
+        return int(json.loads(row["setting_value"]))
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return 0
+
+
+def bump_database_revision(db: sqlite3.Connection) -> int:
+    revision = database_revision(db) + 1
+    db.execute("INSERT OR REPLACE INTO settings (setting_key,setting_value) VALUES (?,?)", ("__revision", json.dumps(revision)))
+    return revision
+
+
 def settings_from_db(db: sqlite3.Connection) -> dict:
     settings = {}
-    for row in db.execute("SELECT setting_key,setting_value FROM settings"):
+    for row in db.execute("SELECT setting_key,setting_value FROM settings WHERE setting_key != ?", ("__revision",)):
         try:
             settings[row["setting_key"]] = json.loads(row["setting_value"])
         except json.JSONDecodeError:
@@ -362,6 +378,7 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
                         "rooms": [room_from_row(row) for row in db.execute("SELECT * FROM rooms ORDER BY name")],
                         "reservations": [reservation_from_row(row) for row in db.execute("SELECT * FROM reservations ORDER BY start_date,start_time")],
                         "settings": settings_from_db(db),
+                        "revision": database_revision(db),
                     }
                 )
             return
@@ -380,7 +397,7 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
                     "users": [dict(row) for row in db.execute("SELECT id,name,email,role,department,status,created_at,updated_at FROM users ORDER BY id")],
                     "rooms": [dict(row) for row in db.execute("SELECT * FROM rooms ORDER BY name")],
                     "reservations": [dict(row) for row in db.execute("SELECT id,room_id,reserved_for,event_name,requested_by,department,date,start_date,end_date,start_time,end_time,time_type,attendees,equipment,remarks,status,assignment_status,rejection_reason,auto_unassigned_at,created_at,updated_at FROM reservations ORDER BY start_date,start_time")],
-                    "settings": [dict(row) for row in db.execute("SELECT setting_key,setting_value FROM settings ORDER BY setting_key")],
+                    "settings": [dict(row) for row in db.execute("SELECT setting_key,setting_value FROM settings WHERE setting_key != ? ORDER BY setting_key", ("__revision",))],
                 }
             self.send_json({"tables": tables, "canEdit": user["role"] == "Super Admin"})
             return
@@ -458,7 +475,9 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
                         "", str(payload.get("remarks", "")).strip(), "Pending", "Assigned", "", None, timestamp, timestamp,
                     ),
                 )
-            self.send_json({"ok": True, "id": reservation_id}, 201)
+            with connect() as db:
+                revision = bump_database_revision(db)
+            self.send_json({"ok": True, "id": reservation_id, "revision": revision}, 201)
             return
         if path == "/api/password":
             user = self.require_user()
@@ -526,6 +545,7 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
                     except (json.JSONDecodeError, TypeError):
                         parsed_value = values["setting_value"]
                     db.execute("UPDATE settings SET setting_value=? WHERE setting_key=?", (json.dumps(parsed_value), record_id))
+                    bump_database_revision(db)
                     self.send_json({"ok": True})
                     return
                 if table == "users":
@@ -542,6 +562,7 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
                     return
                 assignments = ",".join(key + " = ?" for key in values)
                 db.execute("UPDATE " + table + " SET " + assignments + ",updated_at=? WHERE " + id_column + "=?", (*values.values(), now_iso(), record_number))
+                bump_database_revision(db)
             self.send_json({"ok": True})
             return
         if path == "/api/login":
@@ -564,8 +585,11 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
         if path == "/api/state":
             if not self.require_user():
                 return
-            self.save_state(payload)
-            self.send_json({"ok": True})
+            revision = self.save_state(payload)
+            if revision is None:
+                self.send_json({"error": "The schedule changed on another device. Refresh the latest schedule and reapply your change."}, 409)
+                return
+            self.send_json({"ok": True, "revision": revision})
             return
         if path == "/api/users":
             if not self.require_admin():
@@ -621,13 +645,22 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
             return
         self.send_json({"error": "Not found"}, 404)
 
-    def save_state(self, payload: dict) -> None:
+    def save_state(self, payload: dict) -> int | None:
         rooms = payload.get("rooms", [])
         reservations = payload.get("reservations", [])
         settings = payload.get("settings", {})
         timestamp = now_iso()
         with connect() as db:
-            db.execute("BEGIN")
+            db.execute("BEGIN IMMEDIATE")
+            current_revision = database_revision(db)
+            try:
+                expected_revision = int(payload.get("revision", current_revision))
+            except (TypeError, ValueError):
+                db.rollback()
+                return None
+            if expected_revision != current_revision:
+                db.rollback()
+                return None
             db.execute("DELETE FROM reservations")
             db.execute("DELETE FROM rooms")
             for room in rooms:
@@ -649,8 +682,12 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
                     ),
                 )
             for key, value in settings.items():
-                db.execute("INSERT OR REPLACE INTO settings (setting_key,setting_value) VALUES (?,?)", (key, json.dumps(value)))
+                if key != "__revision":
+                    db.execute("INSERT OR REPLACE INTO settings (setting_key,setting_value) VALUES (?,?)", (key, json.dumps(value)))
+            revision = current_revision + 1
+            db.execute("INSERT OR REPLACE INTO settings (setting_key,setting_value) VALUES (?,?)", ("__revision", json.dumps(revision)))
             db.commit()
+            return revision
 
     def serve_static(self, request_path: str) -> None:
         relative = unquote(request_path.lstrip("/")) or "index.html"
