@@ -372,7 +372,8 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json({"users": [user_from_row(row) for row in db.execute("SELECT * FROM users ORDER BY name")]})
             return
         if path == "/api/database":
-            if not self.require_admin():
+            user = self.require_admin()
+            if not user:
                 return
             with connect() as db:
                 tables = {
