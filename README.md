@@ -8,6 +8,8 @@ A SQLite-backed room reservation system for the Company Room Reservation System 
 - Room management with room cards, approval rules, capacity, status, and equipment
 - Reservation creation with whole-day, onwards, blocked, and time-range bookings
 - Overlap and capacity conflict prevention
+- Live schedule updates across admin sessions and the public calendar every 3 seconds
+- Concurrent-save revision checks to prevent stale sessions from silently overwriting bookings
 - Approval queue with approve-all, approve, reject, and reason capture
 - User request page with advance booking and available-time lookup
 - Admin assign/unassign controls, meeting deletion, and automatic end-date unassignment
