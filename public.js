@@ -56,9 +56,9 @@
       const date = new Date(gridStart); date.setDate(gridStart.getDate()+i);
       const day = iso(date);
       const events = reservationsFor(day);
-      const markup = events.slice(0,2).map(item => '<div class="public-booking"><time>'+safe(item.startTime)+'–'+safe(item.endTime)+'</time>'+safe(item.department||"Department")+'</div>').join("");
-      const more = events.length>2 ? '<div class="public-empty">+'+(events.length-2)+' more</div>' : "";
-      nodes.push('<button type="button" class="public-day '+(date.getMonth()===month.getMonth()?"":"other-month")+' '+(day===iso(today)?"today":"")+'" data-date="'+day+'"><div class="public-day-number">'+date.getDate()+'</div>'+(markup||(!events.length?'<span class="public-empty">Open</span>':""))+more+'</button>');
+      const markup = events.slice(0,2).map(item => '<span class="public-booking"><time>'+safe(item.startTime)+'–'+safe(item.endTime)+'</time>'+safe(item.department||"Department")+'</span>').join("");
+      const more = events.length>2 ? '<span class="public-empty">+'+(events.length-2)+' more</div>' : "";
+      nodes.push('<button type="button" class="public-day '+(date.getMonth()===month.getMonth()?"":"other-month")+' '+(day===iso(today)?"today":"")+'" data-date="'+day+'"><span class="public-day-number">'+date.getDate()+'</span>'+(markup||(!events.length?'<span class="public-empty">Open</span>':""))+more+'</button>');
     }
     const calendar=document.getElementById("calendar");
     calendar.innerHTML=nodes.join("");
