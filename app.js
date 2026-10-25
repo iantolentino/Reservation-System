@@ -251,11 +251,7 @@ function showLogin(message = "") {
 async function boot() {
   if (DEMO_PREVIEW) {
     state = loadState();
-    currentUser = { name: "Demo Administrator", role: "Admin" };
-    isAuthenticated = true;
-    $("#login-screen").classList.add("hidden");
-    $("#app-shell").classList.remove("app-hidden");
-    render();
+    showLogin();
     return;
   }
   try {
@@ -617,6 +613,13 @@ async function deleteUser(id) {
 async function submitLogin(event) {
   event.preventDefault();
   if (DEMO_PREVIEW) {
+    const validDemoLogin = $("#login-email").value.trim().toLowerCase() === "admin@assembly.local" && $("#login-password").value === "admin123";
+    if (!validDemoLogin) {
+      const error = $("#login-error");
+      error.textContent = "Use the demo administrator account shown below.";
+      error.classList.remove("hidden");
+      return;
+    }
     currentUser = { name: "Demo Administrator", role: "Admin" };
     isAuthenticated = true;
     $("#login-screen").classList.add("hidden");
@@ -644,7 +647,7 @@ async function submitLogin(event) {
 }
 
 async function logout() {
-  await fetch("/api/logout", { method: "POST" }).catch(() => {});
+  if (!DEMO_PREVIEW) await fetch("/api/logout", { method: "POST" }).catch(() => {});
   showLogin();
 }
 
