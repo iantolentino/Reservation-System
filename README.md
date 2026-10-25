@@ -58,6 +58,6 @@ Open `/public.html`. Visitors can review confirmed bookings by department and ti
 
 The Vercel preview is a static UI preview. Its demo data and demo accounts are stored in the current browser only; separate visitors do not share changes. Shared logins, public requests, and SQLite data require the Python server and a persistent database.
 
-For cPanel, verify that the hosting plan supports running this Python server as a persistent application and that the `data` directory is writable and backed up. Uploading only the HTML, CSS, and JavaScript files will not provide login, shared reservations, or public request processing.
+The current server uses Python `http.server`, while cPanel Python Application Manager commonly expects a WSGI entry point. Confirm the hosting plan and Python app interface before uploading; the server entry point may need an adapter. The `data` directory must be writable and backed up. Uploading only HTML, CSS, and JavaScript will not provide login, shared reservations, or public request processing.
 
 The current sample room names are placeholders. Replace them with the official meeting room names once they are provided.
