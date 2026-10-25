@@ -1,4 +1,5 @@
 const STORAGE_KEY = "assembly-room-scheduler-v1";
+const DEMO_PREVIEW = new URLSearchParams(window.location.search).has("preview");
 const DEFAULT_DATE = "2026-08-25";
 
 const iconMap = {
@@ -61,7 +62,11 @@ const modalBackdrop = $("#modal-backdrop");
 const modal = $("#modal");
 
 function loadState() {
-  return normalizeState(seedData());
+  try {
+    return normalizeState(JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") || seedData());
+  } catch (_) {
+    return normalizeState(seedData());
+  }
 }
 
 function normalizeState(raw) {
@@ -82,6 +87,10 @@ function normalizeState(raw) {
 }
 
 function saveState() {
+  if (DEMO_PREVIEW) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return Promise.resolve({ ok: true, preview: true });
+  }
   return fetch("/api/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rooms: state.rooms, reservations: state.reservations, settings: state.settings }) })
     .then(response => {
       if (!response.ok) throw new Error("SQLite save failed");
@@ -189,6 +198,7 @@ function render() {
   syncExpiredReservations();
   const views = { dashboard: renderDashboard, rooms: renderRooms, reservations: renderReservations, approvals: renderApprovals, requests: renderRequests, reports: renderReports, settings: renderSettings, calendar: renderCalendar, users: renderUsers, todo: renderTodo, help: renderHelp };
   page.innerHTML = views[currentView]();
+  if (DEMO_PREVIEW) page.insertAdjacentHTML("afterbegin", '<div class="preview-notice"><strong>Vercel preview</strong><span>Demo mode · changes are saved in this browser only.</span></div>');
   $$(".nav-item").forEach(item => item.classList.toggle("active", item.dataset.view === currentView));
   const titleMap = { requests: "Request a room", reports: "Daily report", calendar: "Calendar", users: "Accounts", todo: "To-do list", help: "Help centre" };
   const title = titleMap[currentView] || currentView.charAt(0).toUpperCase() + currentView.slice(1);
@@ -239,6 +249,15 @@ function showLogin(message = "") {
 }
 
 async function boot() {
+  if (DEMO_PREVIEW) {
+    state = loadState();
+    currentUser = { name: "Demo Administrator", role: "Admin" };
+    isAuthenticated = true;
+    $("#login-screen").classList.add("hidden");
+    $("#app-shell").classList.remove("app-hidden");
+    render();
+    return;
+  }
   try {
     const response = await fetch("/api/session");
     if (response.ok) {
