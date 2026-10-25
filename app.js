@@ -263,6 +263,7 @@ async function boot() {
     state = loadState();
     const hint = $(".login-hint");
     if (hint) hint.innerHTML = "<strong>Vercel preview account</strong><span>preview.superadmin@assembly.local · PreviewOnly2026!</span>";
+    $("#login-email").value = "preview.superadmin@assembly.local";
     showLogin();
     return;
   }
