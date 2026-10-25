@@ -1,5 +1,5 @@
 const STORAGE_KEY = "assembly-room-scheduler-v1";
-const DEMO_PREVIEW = new URLSearchParams(window.location.search).has("preview");
+const DEMO_PREVIEW = window.location.hostname.endsWith(".vercel.app");
 const DEFAULT_DATE = "2026-08-25";
 
 const iconMap = {
@@ -61,6 +61,12 @@ const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selec
 const page = $("#page-content");
 const modalBackdrop = $("#modal-backdrop");
 const modal = $("#modal");
+
+function ensurePreviewAccounts() {
+  if (!localStorage.getItem("assembly-demo-users")) {
+    localStorage.setItem("assembly-demo-users", JSON.stringify([{ id: 1, name: "Preview Super Admin", email: "preview.superadmin@assembly.local", department: "Administration", role: "Super Admin", status: "Active", password: "PreviewOnly2026!" }]));
+  }
+}
 
 function loadState() {
   try {
@@ -253,7 +259,10 @@ function showLogin(message = "") {
 
 async function boot() {
   if (DEMO_PREVIEW) {
+    ensurePreviewAccounts();
     state = loadState();
+    const hint = $(".login-hint");
+    if (hint) hint.innerHTML = "<strong>Vercel preview account</strong><span>preview.superadmin@assembly.local · PreviewOnly2026!</span>";
     showLogin();
     return;
   }
