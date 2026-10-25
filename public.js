@@ -1,5 +1,5 @@
 (() => {
-  const preview = new URLSearchParams(location.search).has("preview");
+  const preview = location.hostname.endsWith(".vercel.app");
   const key = "assembly-room-scheduler-v1";
   const today = new Date();
   const iso = date => date.getFullYear() + "-" + String(date.getMonth()+1).padStart(2,"0") + "-" + String(date.getDate()).padStart(2,"0");
@@ -112,7 +112,7 @@
   }
 
   async function loadData() {
-    if(preview){data=previewData();}
+    if(preview){data=previewData();const first=(data.reservations||[]).find(item=>item.startDate||item.date);if(first){const d=new Date((first.startDate||first.date)+"T00:00:00");month=new Date(d.getFullYear(),d.getMonth(),1);}}
     else {
       const response=await fetch("/api/public/bootstrap",{headers:{"Accept":"application/json"}});
       if(!response.ok) throw new Error("Could not load the public room calendar.");
@@ -133,7 +133,7 @@
     if(event.target.checked){
       const start=document.getElementById("start-time").value;
       const [hours,minutes]=start.split(":").map(Number);
-      const endMinutes=hours*60+minutes+30;
+      const endMinutes=Math.min(1439,hours*60+minutes+30);
       document.getElementById("end-time").value=String(Math.floor(endMinutes/60)%24).padStart(2,"0")+":"+String(endMinutes%60).padStart(2,"0");
     }
   });
