@@ -616,6 +616,14 @@ async function deleteUser(id) {
 
 async function submitLogin(event) {
   event.preventDefault();
+  if (DEMO_PREVIEW) {
+    currentUser = { name: "Demo Administrator", role: "Admin" };
+    isAuthenticated = true;
+    $("#login-screen").classList.add("hidden");
+    $("#app-shell").classList.remove("app-hidden");
+    render();
+    return;
+  }
   const error = $("#login-error");
   const button = $(".login-submit");
   if (button) button.disabled = true;
