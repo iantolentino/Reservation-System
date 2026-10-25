@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f5f9fc" />
+  <title>Room availability and request</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .public-page{max-width:1180px;margin:0 auto;padding:32px 24px 60px;color:var(--ink)}
+    .public-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:34px}
+    .public-top a{color:var(--purple-deep);font-weight:700;text-decoration:none}
+    .public-hero{margin-bottom:24px}.public-hero h1{font:800 32px/1.2 "Plus Jakarta Sans",sans-serif;margin:5px 0 8px}.public-hero p{color:var(--ink-soft);margin:0}
+    .public-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(290px,.8fr);gap:20px;align-items:start}
+    .public-panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:20px}
+    .public-panel h2{font-size:17px;margin:0}.public-panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px}
+    .public-calendar-nav{display:flex;align-items:center;gap:8px}.public-calendar-nav strong{min-width:130px;text-align:center}
+    .public-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line)}
+    .public-weekday,.public-day{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:8px;min-width:0}
+    .public-weekday{font-size:11px;color:var(--muted);font-weight:700;text-align:center;background:#f8fafc}
+    .public-day{min-height:112px;background:white}.public-day.other-month{background:#f9fafb;color:#a1aab4}.public-day.today{box-shadow:inset 0 0 0 2px var(--purple)}
+    .public-day-number{font-size:12px;font-weight:700;margin-bottom:6px}
+    .public-booking{font-size:10px;line-height:1.35;padding:4px 5px;border-radius:5px;background:#eaf3ff;color:#16477f;margin-top:4px;overflow-wrap:anywhere}
+    .public-booking time{font-weight:700;display:block}
+    .public-empty{color:var(--muted);font-size:11px}
+    .public-help{margin:12px 0 0;color:var(--muted);font-size:12px}
+    .public-form{display:grid;gap:12px}.public-form .form-field{margin:0}.public-form .form-label{font-size:11px}
+    .urgent-check{display:flex;align-items:flex-start;gap:9px;padding:12px;border:1px solid #f2d6ad;background:#fff8ed;border-radius:9px;font-size:12px;color:#794817}
+    .urgent-check input{margin-top:2px}.urgent-check strong{display:block}
+    .public-alert{padding:10px 12px;border-radius:8px;font-size:12px;background:#e4f3ef;color:#0f5c4e}
+    .public-alert.error{background:#fff0ed;color:#a33324}
+    .public-list{margin-top:20px}.public-list ul{padding-left:20px;margin:10px 0 0;color:var(--ink-soft);font-size:13px}.public-loading{padding:22px;text-align:center;color:var(--muted)}
+    @media(max-width:860px){.public-layout{grid-template-columns:1fr}}
+    @media(max-width:560px){.public-page{padding:18px 12px 38px}.public-day{min-height:90px;padding:5px}.public-booking{font-size:9px;padding:3px}.public-day-number{font-size:11px}.public-weekday{padding:6px 2px;font-size:10px}.public-top{margin-bottom:24px}.public-hero h1{font-size:26px}}
+  </style>
+</head>
+<body>
+  <main class="public-page">
+    <header class="public-top">
+      <a class="brand-name" href="/">Assembly · Room Scheduler</a>
+      <a href="/?preview=1">Staff sign in →</a>
+    </header>
+    <section class="public-hero">
+      <p class="eyebrow">Room availability</p>
+      <h1>Check the calendar before you request</h1>
+      <p>Bookings show only the department and occupied time. Request details are visible to staff who manage reservations.</p>
+    </section>
+    <div class="public-layout">
+      <section class="public-panel">
+        <div class="public-panel-head">
+          <h2>Room calendar</h2>
+          <div class="public-calendar-nav">
+            <button class="button secondary small" id="prev-month" type="button" aria-label="Previous month">←</button>
+            <strong id="month-label"></strong>
+            <button class="button secondary small" id="next-month" type="button" aria-label="Next month">→</button>
+          </div>
+        </div>
+        <div id="calendar" class="public-calendar"><div class="public-loading">Loading availability…</div></div>
+        <p class="public-help">To protect booking details, the public calendar never displays names, event titles, notes, or attendee information.</p>
+        <div class="public-list">
+          <h2 id="selected-day-title">Select a day</h2>
+          <div id="selected-day-list" class="public-empty">Choose a date to see occupied times by department.</div>
+        </div>
+      </section>
+      <section class="public-panel">
+        <div class="public-panel-head"><div><h2>Request a room</h2><p class="panel-subtitle">Your request will be sent for staff approval.</p></div></div>
+        <div id="form-message" aria-live="polite"></div>
+        <form id="public-request-form" class="public-form">
+          <label class="form-field"><span class="form-label">Room</span><select class="form-control" name="roomId" id="room-select" required></select></label>
+          <label class="form-field"><span class="form-label">Department</span><input class="form-control" name="department" maxlength="80" required placeholder="Your department" /></label>
+          <label class="form-field"><span class="form-label">Requested by</span><input class="form-control" name="requestedBy" maxlength="100" required placeholder="Your name" /></label>
+          <label class="form-field"><span class="form-label">Date</span><input class="form-control" type="date" name="date" id="request-date" required /></label>
+          <div class="form-grid">
+            <label class="form-field"><span class="form-label">Start time</span><input class="form-control" type="time" name="startTime" id="start-time" required /></label>
+            <label class="form-field"><span class="form-label">End time</span><input class="form-control" type="time" name="endTime" id="end-time" required /></label>
+          </div>
+          <label class="form-field"><span class="form-label">Number of attendees</span><input class="form-control" type="number" name="attendees" min="1" max="500" value="1" required /></label>
+          <label class="urgent-check"><input type="checkbox" id="urgent-request" name="urgent" value="true" /><span><strong>Urgent request</strong>Urgent bookings are limited to 30 minutes.</span></label>
+          <label class="form-field"><span class="form-label">Purpose</span><input class="form-control" name="eventName" maxlength="120" required placeholder="Briefly describe the meeting" /></label>
+          <label class="form-field"><span class="form-label">Additional notes (optional)</span><textarea class="form-control" name="remarks" maxlength="500" rows="3" placeholder="Anything staff should know"></textarea></label>
+          <button class="button" type="submit">Send room request</button>
+        </form>
+      </section>
+    </div>
+  </main>
+  <script src="public.js"></script>
+</body>
+</html>
