@@ -493,6 +493,7 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
                     self.send_json({"error": "Current password is incorrect."}, 400)
                     return
                 db.execute("UPDATE users SET password_hash=?,updated_at=? WHERE id=?", (hash_password(new_password), now_iso(), user["id"]))
+                bump_database_revision(db)
             self.send_json({"ok": True})
             return
         if path == "/api/database/update":
@@ -609,6 +610,7 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
                         (name, email, hash_password(password), role, department, "Active", timestamp, timestamp),
                     )
                     row = db.execute("SELECT * FROM users WHERE id = ?", (cursor.lastrowid,)).fetchone()
+                    bump_database_revision(db)
                 self.send_json({"user": user_from_row(row)}, 201)
             except sqlite3.IntegrityError:
                 self.send_json({"error": "An account with that email already exists"}, 409)
@@ -640,6 +642,7 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
                     self.send_json({"error": "Keep at least one active admin account"}, 400)
                     return
                 db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+                bump_database_revision(db)
             self.send_json({"ok": True})
             return
         self.send_json({"error": "Not found"}, 404)
