@@ -490,9 +490,119 @@ function reportLine(reservation) {
   return `<p class="report-line">${escapeHtml(line)}</p>`;
 }
 
+function renderDatabase() {
+  const tables = databaseSnapshot?.tables || {};
+  const canEdit = currentUser?.role === "Super Admin";
+  const notice = canEdit
+    ? "Super Admin can edit database records. Password hashes are never displayed."
+    : "Read-only access. Only the Super Admin can edit database records.";
+  return pageHeading("Administration", "Database", "Review the application records stored in SQLite.", "") +
+    '<div class="preview-notice"><strong>' + (canEdit ? "Editable" : "View only") + '</strong><span>' + notice + '</span></div>' +
+    Object.entries(tables).map(([name, rows]) => databaseTable(name, rows, canEdit)).join("") +
+    (!Object.keys(tables).length ? emptyState("Loading database", "Fetching records from the SQLite database.") : "");
+}
+
+function databaseTable(name, rows, canEdit) {
+  const title = name.charAt(0).toUpperCase() + name.slice(1);
+  if (!rows?.length) return '<section class="panel view-panel database-panel"><h2>' + escapeHtml(title) + '</h2>' + emptyState("No records", "This table is empty.") + '</section>';
+  const columns = Object.keys(rows[0]);
+  const editable = canEdit;
+  const header = columns.map(column => '<th>' + escapeHtml(column.replaceAll("_", " ")) + '</th>').join("") + (editable ? "<th>Actions</th>" : "");
+  const body = rows.map(row => {
+    const rowId = row.id ?? row.setting_key;
+    return '<tr>' + columns.map(column => '<td>' + escapeHtml(row[column] ?? "") + '</td>').join("") +
+      (editable ? '<td><button class="table-action" data-action="edit-db-row" data-table="' + name + '" data-id="' + escapeHtml(rowId) + '">Edit</button></td>' : "") + '</tr>';
+  }).join("");
+  return '<section class="panel view-panel database-panel"><div class="panel-header"><div><h2>' + escapeHtml(title) + '</h2><p class="panel-subtitle">' + rows.length + ' records</p></div></div><div class="table-wrap"><table><thead><tr>' + header + '</tr></thead><tbody>' + body + '</tbody></table></div></section>';
+}
+
+async function fetchDatabase() {
+  if (DEMO_PREVIEW) {
+    const accounts = JSON.parse(localStorage.getItem("assembly-demo-users") || "[]").map(({password, ...user}) => user);
+    databaseSnapshot = { tables: {
+      users: accounts,
+      rooms: state.rooms.map(room => ({id:room.id,name:room.name,type:room.type,location:room.location,capacity:room.capacity,equipment:room.equipment,status:room.status,requires_approval:room.requiresApproval})),
+      reservations: state.reservations.map(item => ({id:item.id,room_id:item.roomId,reserved_for:item.reservedFor,event_name:item.eventName,requested_by:item.requestedBy,department:item.department,date:item.date,start_date:item.startDate,end_date:item.endDate,start_time:item.startTime,end_time:item.endTime,time_type:item.timeType,attendees:item.attendees,equipment:item.equipment,remarks:item.remarks,status:item.status,assignment_status:item.assignmentStatus})),
+      settings: Object.entries(state.settings).map(([setting_key,setting_value])=>({setting_key,setting_value:JSON.stringify(setting_value)}))
+    }};
+    render();
+    return;
+  }
+  try {
+    const response = await fetch("/api/database");
+    if (!response.ok) throw new Error("Database access unavailable");
+    databaseSnapshot = await response.json();
+    render();
+  } catch (_) {
+    showToast("Could not load database", "Check the SQLite server connection and your account permissions.", "error");
+  }
+}
+
+function openDatabaseRow(table, id) {
+  if (currentUser?.role !== "Super Admin") return showToast("Read-only access", "Only the Super Admin can edit database records.", "error");
+  const rows = databaseSnapshot?.tables?.[table] || [];
+  const record = rows.find(row => String(row.id ?? row.setting_key) === String(id));
+  if (!record) return;
+  const excluded = ["id","created_at","updated_at","auto_unassigned_at"];
+  const fields = Object.entries(record).filter(([key]) => !excluded.includes(key));
+  const formFields = fields.map(([key,value]) => '<label class="form-field"><span class="form-label">' + escapeHtml(key.replaceAll("_", " ")) + '</span><input class="form-control" name="' + escapeHtml(key) + '" value="' + escapeHtml(value ?? "") + '" /></label>').join("");
+  openModal('<div class="modal-header"><div><h2 id="modal-title">Edit database record</h2><p>' + escapeHtml(table) + ' · ' + escapeHtml(id) + '</p></div><button class="modal-close" data-action="close-modal">×</button></div><form id="database-row-form"><div class="modal-body"><div class="form-grid">' + formFields + '</div></div><div class="modal-footer"><button type="button" class="button secondary" data-action="close-modal">Cancel</button><button type="submit" class="button">Save record</button></div></form>');
+  $("#database-row-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.target).entries());
+    if (DEMO_PREVIEW) {
+      Object.assign(record, values);
+      if (table === "rooms") state.rooms = databaseSnapshot.tables.rooms.map(row=>({id:row.id,name:row.name,type:row.type,location:row.location,capacity:Number(row.capacity),equipment:row.equipment,status:row.status,requiresApproval:["1","true","yes","on"].includes(String(row.requires_approval).toLowerCase())}));
+      if (table === "reservations") state.reservations = databaseSnapshot.tables.reservations.map(row=>({...row,roomId:row.room_id,reservedFor:row.reserved_for,eventName:row.event_name,requestedBy:row.requested_by,date:row.date,startDate:row.start_date,endDate:row.end_date,startTime:row.start_time,endTime:row.end_time,timeType:row.time_type,assignmentStatus:row.assignment_status,attendees:Number(row.attendees)}));
+      if (table === "settings") { try { state.settings[record.setting_key] = JSON.parse(values.setting_value); } catch (_) { state.settings[record.setting_key] = values.setting_value; } }
+      if (table === "users") {
+        const accounts=JSON.parse(localStorage.getItem("assembly-demo-users")||"[]");
+        const account=accounts.find(item=>String(item.id)===String(id));
+        if(account) Object.assign(account,values);
+        localStorage.setItem("assembly-demo-users",JSON.stringify(accounts));
+      }
+      saveState();
+      closeModal();
+      fetchDatabase();
+      showToast("Preview record saved", "This change is stored in this browser only.", "success");
+      return;
+    }
+    try {
+      const response = await fetch("/api/database/update", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ table, recordId: id, values }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not save record");
+      closeModal(); fetchDatabase(); showToast("Database record updated", "The SQLite record was saved.", "success");
+    } catch (error) { showToast("Could not save record", error.message, "error"); }
+  });
+}
+
+function openPasswordModal() {
+  openModal('<div class="modal-header"><div><h2 id="modal-title">Change password</h2><p>Choose a new password with at least 10 characters.</p></div><button class="modal-close" data-action="close-modal">×</button></div><form id="password-form"><div class="modal-body"><div id="password-error" class="login-error hidden"></div><label class="form-field"><span class="form-label">Current password</span><input class="form-control" type="password" name="currentPassword" required autocomplete="current-password" /></label><label class="form-field"><span class="form-label">New password</span><input class="form-control" type="password" name="newPassword" minlength="10" required autocomplete="new-password" /></label><label class="form-field"><span class="form-label">Confirm new password</span><input class="form-control" type="password" name="confirmPassword" minlength="10" required autocomplete="new-password" /></label></div><div class="modal-footer"><button type="button" class="button secondary" data-action="close-modal">Cancel</button><button type="submit" class="button">Update password</button></div></form>');
+  $("#password-form").addEventListener("submit", submitPasswordChange);
+}
+
+async function submitPasswordChange(event) {
+  event.preventDefault();
+  const payload = Object.fromEntries(new FormData(event.target).entries());
+  if (payload.newPassword !== payload.confirmPassword) {
+    const error=$("#password-error"); error.textContent="The new passwords do not match."; error.classList.remove("hidden"); return;
+  }
+  if (DEMO_PREVIEW) {
+    const accounts=JSON.parse(localStorage.getItem("assembly-demo-users")||"[]");
+    const account=accounts.find(user=>String(user.id)===String(currentUser.id));
+    if(account){account.password=payload.newPassword;localStorage.setItem("assembly-demo-users",JSON.stringify(accounts));}
+    closeModal();showToast("Preview password changed","This password is stored in this browser only.","success");return;
+  }
+  try {
+    const response=await fetch("/api/password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({currentPassword:payload.currentPassword,newPassword:payload.newPassword})});
+    const result=await response.json();if(!response.ok)throw new Error(result.error||"Could not change password");
+    closeModal();showToast("Password updated","Use your new password the next time you sign in.","success");
+  } catch(error){const notice=$("#password-error");notice.textContent=error.message;notice.classList.remove("hidden");}
+}
+
 function renderSettings() {
   return `${pageHeading("Workspace", "Settings", "Keep your report defaults and notifications in sync with the team.", `<button class="button" data-action="save-settings">Save changes</button>`)}
-    <div class="settings-layout"><nav class="settings-nav"><button class="active">General</button><button>Notifications</button><button>Permissions</button></nav><div><section class="panel settings-card"><h2>Report defaults</h2><p>These details are used when the daily schedule is generated.</p><div class="form-grid"><label class="form-field"><span class="form-label">Prepared by</span><input class="form-control" id="settings-prepared-by" value="${escapeHtml(state.settings.preparedBy)}" /></label><label class="form-field"><span class="form-label">Report audience</span><input class="form-control" id="settings-audience" value="${escapeHtml(state.settings.reportAudience)}" /></label></div><div class="settings-save"><button class="button" data-action="save-settings">Save changes</button></div></section><section class="panel settings-card"><h2>Notifications</h2><p>Choose what the reservation team should receive automatically.</p>${toggleRow("email-notifications", "Reservation notifications", "Email the requester when a booking is submitted or approved.", state.settings.emailNotifications)}${toggleRow("approval-reminders", "Approval reminders", "Remind approvers about requests that have been waiting for more than one day.", state.settings.approvalReminders)}</section></div></div>`;
+    <div class="settings-layout"><nav class="settings-nav"><button class="active">General</button><button>Notifications</button><button>Permissions</button></nav><div><section class="panel settings-card"><h2>Report defaults</h2><p>These details are used when the daily schedule is generated.</p><div class="form-grid"><label class="form-field"><span class="form-label">Prepared by</span><input class="form-control" id="settings-prepared-by" value="${escapeHtml(state.settings.preparedBy)}" /></label><label class="form-field"><span class="form-label">Report audience</span><input class="form-control" id="settings-audience" value="${escapeHtml(state.settings.reportAudience)}" /></label></div><div class="settings-save"><button class="button" data-action="save-settings">Save changes</button></div></section><section class="panel settings-card"><h2>Notifications</h2><p>Choose what the reservation team should receive automatically.</p>${toggleRow("email-notifications", "Reservation notifications", "Email the requester when a booking is submitted or approved.", state.settings.emailNotifications)}${toggleRow("approval-reminders", "Approval reminders", "Remind approvers about requests that have been waiting for more than one day.", state.settings.approvalReminders)}</section><section class="panel settings-card"><h2>Account security</h2><p>Change your sign-in password whenever you need to.</p><button class="button secondary" data-action="change-password">Change password</button></section></div></div>`;
 }
 
 function toggleRow(id, title, copy, isOn) {
@@ -506,7 +616,7 @@ function renderHelp() {
 
 function bindViewEvents() {
   $$("[data-view]").forEach(element => element.addEventListener("click", () => navigate(element.dataset.view)));
-  $$("[data-action]").forEach(element => element.addEventListener("click", () => handleAction(element.dataset.action, element.dataset.id, element.dataset.roomId, element.dataset.period || element.dataset.setting, element.dataset.start, element.dataset.end)));
+  $("[data-action]").forEach(element => element.addEventListener("click", () => handleAction(element.dataset.action, element.dataset.id, element.dataset.roomId, element.dataset.period || element.dataset.setting, element.dataset.start, element.dataset.end, element.dataset.table)));
   const roomInput = $("#room-search");
   if (roomInput) roomInput.addEventListener("input", event => { roomSearch = event.target.value; render(); requestAnimationFrame(() => { const input = $("#room-search"); input?.focus(); input?.setSelectionRange(roomSearch.length, roomSearch.length); }); });
   const reservationInput = $("#reservation-search");
@@ -534,7 +644,7 @@ function navigate(view) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function handleAction(action, id, roomId, setting, startTime, endTime) {
+function handleAction(action, id, roomId, setting, startTime, endTime, table) {
   if (action === "calendar-prev") { calendarCursor.setMonth(calendarCursor.getMonth() - 1); render(); }
   if (action === "calendar-next") { calendarCursor.setMonth(calendarCursor.getMonth() + 1); render(); }
   if (action === "calendar-today") { calendarCursor = dateObject(DEFAULT_DATE); render(); }
@@ -559,6 +669,8 @@ function handleAction(action, id, roomId, setting, startTime, endTime) {
   if (action === "toggle-assignment") toggleAssignment(id);
   if (action === "delete-reservation") openDeleteReservationModal(id);
   if (action === "new-user") openUserModal();
+  if (action === "change-password") openPasswordModal();
+  if (action === "edit-db-row") openDatabaseRow(table, id);
   if (action === "delete-user") openDeleteUserModal(id);
   if (action === "logout") logout();
   if (action === "save-settings") saveSettingsFromForm();
@@ -669,7 +781,7 @@ function openModal(content) {
   modalBackdrop.classList.remove("hidden");
   currentModal = true;
   document.body.style.overflow = "hidden";
-  $$('[data-action]', modal).forEach(button => button.addEventListener("click", () => handleAction(button.dataset.action, button.dataset.id, button.dataset.roomId, button.dataset.period || button.dataset.setting, button.dataset.start, button.dataset.end)));
+  $('[data-action]', modal).forEach(button => button.addEventListener("click", () => handleAction(button.dataset.action, button.dataset.id, button.dataset.roomId, button.dataset.period || button.dataset.setting, button.dataset.start, button.dataset.end, button.dataset.table)));
   const firstInput = $("input, select, textarea", modal);
   firstInput?.focus();
 }
