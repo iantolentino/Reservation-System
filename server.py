@@ -574,8 +574,8 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
             password = str(payload.get("password", ""))
             role = "Admin"
             department = str(payload.get("department", "Operations")).strip() or "Operations"
-            if not name or not email or len(password) < 6:
-                self.send_json({"error": "Name, email, and a password of at least 6 characters are required"}, 400)
+            if not name or not email or len(password) < 10:
+                self.send_json({"error": "Name, email, and a password of at least 10 characters are required"}, 400)
                 return
             try:
                 with connect() as db:
