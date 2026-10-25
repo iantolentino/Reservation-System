@@ -281,6 +281,8 @@ async function refreshLiveState(force = false) {
           showToast("Schedule updated", "Changes from another preview tab are now visible.", "info");
         }
       }
+      if (currentView === "users") fetchUsers();
+      if (currentView === "database") fetchDatabase();
       return;
     }
     const response = await fetch("/api/bootstrap", { headers: { "Accept": "application/json" } });
@@ -289,7 +291,12 @@ async function refreshLiveState(force = false) {
       return;
     }
     const payload = await response.json();
+    const priorRevision = serverRevision;
     serverRevision = Number(payload.revision ?? serverRevision);
+    if (serverRevision !== priorRevision) {
+      if (currentView === "users") fetchUsers();
+      if (currentView === "database") fetchDatabase();
+    }
     const incoming = normalizeState(payload);
     if (liveStateSignature(incoming) !== liveStateSignature(state)) {
       state = incoming;
