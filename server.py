@@ -484,8 +484,10 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
             record_id = str(payload.get("recordId", ""))
             values = payload.get("values", {})
             allowed = {
+                "users": {"name","email","role","department","status"},
                 "rooms": {"name","type","location","capacity","equipment","status","requires_approval"},
-                "reservations": {"room_id","reserved_for","event_name","requested_by","department","date","start_date","end_date","start_time","end_time","time_type","attendees","equipment","remarks","status","assignment_status","rejection_reason"},
+                "reservations": {"room_id","reserved_for","event_name","requested_by","department","date","start_date","end_date","start_time","end_time","time_type","attendees","equipment","remarks","status","assignment_status","rejection_reason","auto_unassigned_at"},
+                "settings": {"setting_value"},
             }
             if table not in allowed or not isinstance(values, dict) or not values or any(key not in allowed[table] for key in values):
                 self.send_json({"error": "Choose a supported database record and fields."}, 400)
@@ -501,21 +503,44 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
                         raise ValueError()
                 if "requires_approval" in values:
                     values["requires_approval"] = 1 if str(values["requires_approval"]).lower() in ("1","true","yes","on") else 0
+                if table == "users":
+                    if "role" in values and values["role"] not in ("Admin", "Employee"):
+                        raise ValueError()
+                    if "status" in values and values["status"] not in ("Active", "Disabled"):
+                        raise ValueError()
+                    record_number = int(record_id)
+                else:
+                    record_number = record_id
             except (TypeError, ValueError):
-                self.send_json({"error": "Enter a valid number for numeric fields."}, 400)
+                self.send_json({"error": "Enter valid values for the selected fields."}, 400)
                 return
             with connect() as db:
-                if table == "rooms":
-                    row = db.execute("SELECT id FROM rooms WHERE id=?", (record_id,)).fetchone()
+                if table == "settings":
+                    row = db.execute("SELECT setting_key FROM settings WHERE setting_key=?", (record_id,)).fetchone()
+                    if not row:
+                        self.send_json({"error": "Database record not found."}, 404)
+                        return
+                    try:
+                        parsed_value = json.loads(values["setting_value"])
+                    except (json.JSONDecodeError, TypeError):
+                        parsed_value = values["setting_value"]
+                    db.execute("UPDATE settings SET setting_value=? WHERE setting_key=?", (json.dumps(parsed_value), record_id))
+                    self.send_json({"ok": True})
+                    return
+                if table == "users":
+                    row = db.execute("SELECT id,role FROM users WHERE id=?", (record_number,)).fetchone()
+                    if row and row["role"] == "Super Admin" and ({"role","status"} & set(values)):
+                        self.send_json({"error": "The Super Admin role and status cannot be changed from the database editor."}, 403)
+                        return
                     id_column = "id"
                 else:
-                    row = db.execute("SELECT id FROM reservations WHERE id=?", (record_id,)).fetchone()
+                    row = db.execute("SELECT id FROM " + table + " WHERE id=?", (record_id,)).fetchone()
                     id_column = "id"
                 if not row:
                     self.send_json({"error": "Database record not found."}, 404)
                     return
                 assignments = ",".join(key + " = ?" for key in values)
-                db.execute("UPDATE " + table + " SET " + assignments + ",updated_at=? WHERE " + id_column + "=?", (*values.values(), now_iso(), record_id))
+                db.execute("UPDATE " + table + " SET " + assignments + ",updated_at=? WHERE " + id_column + "=?", (*values.values(), now_iso(), record_number))
             self.send_json({"ok": True})
             return
         if path == "/api/login":
