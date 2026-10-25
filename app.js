@@ -681,6 +681,11 @@ function handleAction(action, id, roomId, setting, startTime, endTime, table) {
 
 async function fetchUsers() {
   if (!["Admin", "Super Admin"].includes(currentUser?.role)) return;
+  if (DEMO_PREVIEW) {
+    users = JSON.parse(localStorage.getItem("assembly-demo-users") || "[]").map(({password, ...user}) => user);
+    render();
+    return;
+  }
   try {
     const response = await fetch("/api/users");
     if (!response.ok) throw new Error("Account list unavailable");
@@ -692,13 +697,22 @@ async function fetchUsers() {
 }
 
 function openUserModal() {
-  openModal('<div class="modal-header"><div><h2 id="modal-title">Add account</h2><p>Create a sign-in with full admin access by default.</p></div><button class="modal-close" data-action="close-modal">×</button></div><form id="user-form"><div class="modal-body"><div class="form-grid"><label class="form-field full"><span class="form-label">Full name <b class="required">*</b></span><input class="form-control" name="name" placeholder="e.g. Alex Santos" required /></label><label class="form-field"><span class="form-label">Email <b class="required">*</b></span><input class="form-control" name="email" type="email" placeholder="alex@company.com" required /></label><label class="form-field"><span class="form-label">Department</span><input class="form-control" name="department" value="Operations" /></label><label class="form-field"><span class="form-label">Access</span><select class="form-control" name="role"><option value="Admin">Admin · Full access</option><option value="Employee">Employee · Request access</option></select></label><label class="form-field"><span class="form-label">Temporary password <b class="required">*</b></span><input class="form-control" name="password" type="password" minlength="6" placeholder="At least 6 characters" required /></label></div><div class="modal-notice">✦ &nbsp; Admin accounts can add and delete accounts, manage rooms, and control schedules.</div></div><div class="modal-footer"><button type="button" class="button secondary" data-action="close-modal">Cancel</button><button type="submit" class="button">Create account</button></div></form>');
+  openModal('<div class="modal-header"><div><h2 id="modal-title">Add account</h2><p>Create a sign-in with full admin access by default.</p></div><button class="modal-close" data-action="close-modal">×</button></div><form id="user-form"><div class="modal-body"><div class="form-grid"><label class="form-field full"><span class="form-label">Full name <b class="required">*</b></span><input class="form-control" name="name" placeholder="e.g. Alex Santos" required /></label><label class="form-field"><span class="form-label">Email <b class="required">*</b></span><input class="form-control" name="email" type="email" placeholder="alex@company.com" required /></label><label class="form-field"><span class="form-label">Department</span><input class="form-control" name="department" value="Operations" /></label><label class="form-field"><span class="form-label">Access</span><input class="form-control" value="Admin · Full access except database editing" disabled /></label><label class="form-field"><span class="form-label">Temporary password <b class="required">*</b></span><input class="form-control" name="password" type="password" minlength="10" placeholder="At least 10 characters" required /></label></div><div class="modal-notice">✦ &nbsp; Admin accounts can add and delete accounts, manage rooms, and control schedules.</div></div><div class="modal-footer"><button type="button" class="button secondary" data-action="close-modal">Cancel</button><button type="submit" class="button">Create account</button></div></form>');
   $("#user-form").addEventListener("submit", submitUser);
 }
 
 async function submitUser(event) {
   event.preventDefault();
   const payload = Object.fromEntries(new FormData(event.target).entries());
+  if (payload.password.length < 10) return showToast("Account not created", "Use a temporary password with at least 10 characters.", "error");
+  if (DEMO_PREVIEW) {
+    const accounts = JSON.parse(localStorage.getItem("assembly-demo-users") || "[]");
+    if (accounts.some(user => user.email.toLowerCase() === payload.email.toLowerCase())) return showToast("Account not created", "An account with that email already exists.", "error");
+    accounts.push({ id: Date.now(), name: payload.name, email: payload.email, department: payload.department || "Operations", role: "Admin", status: "Active", password: payload.password });
+    localStorage.setItem("assembly-demo-users", JSON.stringify(accounts));
+    users = accounts.map(({password, ...user}) => user);
+    closeModal(); render(); showToast("Admin account created", "The account can sign in to this preview in this browser.", "success"); return;
+  }
   try {
     const response = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     const result = await response.json();
@@ -722,6 +736,12 @@ function openDeleteUserModal(id) {
 }
 
 async function deleteUser(id) {
+  if (DEMO_PREVIEW) {
+    const accounts = JSON.parse(localStorage.getItem("assembly-demo-users") || "[]").filter(user => String(user.id) !== String(id));
+    localStorage.setItem("assembly-demo-users", JSON.stringify(accounts));
+    users = accounts.map(({password, ...user}) => user);
+    closeModal(); render(); showToast("Account deleted", "The preview account was removed.", "success"); return;
+  }
   try {
     const response = await fetch("/api/users/" + id, { method: "DELETE" });
     const result = await response.json();
@@ -738,14 +758,15 @@ async function deleteUser(id) {
 async function submitLogin(event) {
   event.preventDefault();
   if (DEMO_PREVIEW) {
-    const validDemoLogin = $("#login-email").value.trim().toLowerCase() === "admin@assembly.local" && $("#login-password").value === "admin123";
-    if (!validDemoLogin) {
+    const accounts = JSON.parse(localStorage.getItem("assembly-demo-users") || "[]");
+    const account = accounts.find(user => user.email.toLowerCase() === $("#login-email").value.trim().toLowerCase() && user.password === $("#login-password").value);
+    if (!account) {
       const error = $("#login-error");
-      error.textContent = "Use the demo administrator account shown below.";
+      error.textContent = "Email or password is incorrect. Use the preview credentials shown below.";
       error.classList.remove("hidden");
       return;
     }
-    currentUser = { name: "Demo Administrator", role: "Admin" };
+    currentUser = { id: account.id, name: account.name, email: account.email, role: account.role, department: account.department };
     isAuthenticated = true;
     $("#login-screen").classList.add("hidden");
     $("#app-shell").classList.remove("app-hidden");
