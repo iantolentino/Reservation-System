@@ -118,12 +118,20 @@ def initialize_database() -> None:
 
 def seed_database(db: sqlite3.Connection) -> None:
     timestamp = now_iso()
-    admin = db.execute("SELECT id FROM users WHERE email = ?", ("admin@assembly.local",)).fetchone()
-    if not admin:
-        db.execute(
-            "INSERT INTO users (name,email,password_hash,role,department,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
-            ("Marisol Santos", "admin@assembly.local", hash_password("admin123"), "Admin", "Operations", "Active", timestamp, timestamp),
-        )
+    superadmin = db.execute("SELECT id FROM users WHERE email = ?", ("superadmin@stratastaff.com",)).fetchone()
+    if not superadmin:
+        legacy = db.execute("SELECT id FROM users WHERE email = ?", ("admin@assembly.local",)).fetchone()
+        password_hash = "N538+6KBU8BbDiW60g+JAA==$CrYf50BgfeqGqdN+1tR2PffD/JKx3wAHpjD3KASlqRw="
+        if legacy:
+            db.execute(
+                "UPDATE users SET name=?,email=?,password_hash=?,role=?,department=?,status='Active',updated_at=? WHERE id=?",
+                ("Strata Staff Super Admin", "superadmin@stratastaff.com", password_hash, "Super Admin", "Administration", timestamp, legacy["id"]),
+            )
+        else:
+            db.execute(
+                "INSERT INTO users (name,email,password_hash,role,department,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                ("Strata Staff Super Admin", "superadmin@stratastaff.com", password_hash, "Super Admin", "Administration", "Active", timestamp, timestamp),
+            )
 
     if db.execute("SELECT COUNT(*) AS count FROM rooms").fetchone()["count"] == 0:
         rooms = [
@@ -278,8 +286,15 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
 
     def require_admin(self) -> dict | None:
         user = self.require_user()
-        if user and user["role"] != "Admin":
+        if user and user["role"] not in ("Admin", "Super Admin"):
             self.send_json({"error": "Admin access required"}, 403)
+            return None
+        return user
+
+    def require_superadmin(self) -> dict | None:
+        user = self.require_user()
+        if user and user["role"] != "Super Admin":
+            self.send_json({"error": "Super Admin access required"}, 403)
             return None
         return user
 
@@ -355,6 +370,18 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
                 return
             with connect() as db:
                 self.send_json({"users": [user_from_row(row) for row in db.execute("SELECT * FROM users ORDER BY name")]})
+            return
+        if path == "/api/database":
+            if not self.require_admin():
+                return
+            with connect() as db:
+                tables = {
+                    "users": [dict(row) for row in db.execute("SELECT id,name,email,role,department,status,created_at,updated_at FROM users ORDER BY id")],
+                    "rooms": [dict(row) for row in db.execute("SELECT * FROM rooms ORDER BY name")],
+                    "reservations": [dict(row) for row in db.execute("SELECT id,room_id,reserved_for,event_name,requested_by,department,date,start_date,end_date,start_time,end_time,time_type,attendees,equipment,remarks,status,assignment_status,rejection_reason,auto_unassigned_at,created_at,updated_at FROM reservations ORDER BY start_date,start_time")],
+                    "settings": [dict(row) for row in db.execute("SELECT setting_key,setting_value FROM settings ORDER BY setting_key")],
+                }
+            self.send_json({"tables": tables, "canEdit": user["role"] == "Super Admin"})
             return
         self.send_json({"error": "Not found"}, 404)
 
@@ -432,6 +459,65 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
                 )
             self.send_json({"ok": True, "id": reservation_id}, 201)
             return
+        if path == "/api/password":
+            user = self.require_user()
+            if not user:
+                return
+            current_password = str(payload.get("currentPassword", ""))
+            new_password = str(payload.get("newPassword", ""))
+            if len(new_password) < 10:
+                self.send_json({"error": "Use a password with at least 10 characters."}, 400)
+                return
+            with connect() as db:
+                row = db.execute("SELECT id,password_hash FROM users WHERE id = ?", (user["id"],)).fetchone()
+                if not row or not verify_password(current_password, row["password_hash"]):
+                    self.send_json({"error": "Current password is incorrect."}, 400)
+                    return
+                db.execute("UPDATE users SET password_hash=?,updated_at=? WHERE id=?", (hash_password(new_password), now_iso(), user["id"]))
+            self.send_json({"ok": True})
+            return
+        if path == "/api/database/update":
+            user = self.require_superadmin()
+            if not user:
+                return
+            table = str(payload.get("table", ""))
+            record_id = str(payload.get("recordId", ""))
+            values = payload.get("values", {})
+            allowed = {
+                "rooms": {"name","type","location","capacity","equipment","status","requires_approval"},
+                "reservations": {"room_id","reserved_for","event_name","requested_by","department","date","start_date","end_date","start_time","end_time","time_type","attendees","equipment","remarks","status","assignment_status","rejection_reason"},
+            }
+            if table not in allowed or not isinstance(values, dict) or not values or any(key not in allowed[table] for key in values):
+                self.send_json({"error": "Choose a supported database record and fields."}, 400)
+                return
+            try:
+                if "capacity" in values:
+                    values["capacity"] = int(values["capacity"])
+                    if values["capacity"] < 1:
+                        raise ValueError()
+                if "attendees" in values:
+                    values["attendees"] = int(values["attendees"])
+                    if values["attendees"] < 0:
+                        raise ValueError()
+                if "requires_approval" in values:
+                    values["requires_approval"] = 1 if str(values["requires_approval"]).lower() in ("1","true","yes","on") else 0
+            except (TypeError, ValueError):
+                self.send_json({"error": "Enter a valid number for numeric fields."}, 400)
+                return
+            with connect() as db:
+                if table == "rooms":
+                    row = db.execute("SELECT id FROM rooms WHERE id=?", (record_id,)).fetchone()
+                    id_column = "id"
+                else:
+                    row = db.execute("SELECT id FROM reservations WHERE id=?", (record_id,)).fetchone()
+                    id_column = "id"
+                if not row:
+                    self.send_json({"error": "Database record not found."}, 404)
+                    return
+                assignments = ",".join(key + " = ?" for key in values)
+                db.execute("UPDATE " + table + " SET " + assignments + ",updated_at=? WHERE " + id_column + "=?", (*values.values(), now_iso(), record_id))
+            self.send_json({"ok": True})
+            return
         if path == "/api/login":
             email = str(payload.get("email", "")).strip().lower()
             password = str(payload.get("password", ""))
@@ -461,7 +547,7 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
             name = str(payload.get("name", "")).strip()
             email = str(payload.get("email", "")).strip().lower()
             password = str(payload.get("password", ""))
-            role = str(payload.get("role", "Admin")).strip() or "Admin"
+            role = "Admin"
             department = str(payload.get("department", "Operations")).strip() or "Operations"
             if not name or not email or len(password) < 6:
                 self.send_json({"error": "Name, email, and a password of at least 6 characters are required"}, 400)
@@ -497,6 +583,9 @@ class SchedulerHandler(http.server.BaseHTTPRequestHandler):
                 target = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
                 if not target:
                     self.send_json({"error": "Account not found"}, 404)
+                    return
+                if target["role"] == "Super Admin":
+                    self.send_json({"error": "Super Admin accounts cannot be deleted here."}, 403)
                     return
                 if target["role"] == "Admin" and db.execute("SELECT COUNT(*) AS count FROM users WHERE role = 'Admin' AND status = 'Active'").fetchone()["count"] <= 1:
                     self.send_json({"error": "Keep at least one active admin account"}, 400)
