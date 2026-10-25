@@ -449,7 +449,10 @@ function renderUsers() {
 
 function accountRow(user) {
   const isSelf = user.id === currentUser?.id;
-  return '<div class="account-row"><div class="avatar avatar-purple">' + initials(user.name) + '</div><div class="account-copy"><strong>' + escapeHtml(user.name) + '</strong><small>' + escapeHtml(user.email) + ' · ' + escapeHtml(user.department || "Operations") + '</small></div><span class="role-pill ' + (user.role === "Admin" ? "admin" : "") + '">' + escapeHtml(user.role) + '</span><button class="account-delete" data-action="delete-user" data-id="' + user.id + '" ' + (isSelf ? "disabled" : "") + '>' + (isSelf ? "Current account" : "Delete") + '</button></div>';
+  const protectedAccount = user.role === "Super Admin";
+  const disabled = isSelf || protectedAccount;
+  const actionLabel = isSelf ? "Current account" : protectedAccount ? "Protected" : "Delete";
+  return '<div class="account-row"><div class="avatar avatar-purple">' + initials(user.name) + '</div><div class="account-copy"><strong>' + escapeHtml(user.name) + '</strong><small>' + escapeHtml(user.email) + ' · ' + escapeHtml(user.department || "Operations") + '</small></div><span class="role-pill ' + (user.role === "Admin" || user.role === "Super Admin" ? "admin" : "") + '">' + escapeHtml(user.role) + '</span><button class="account-delete" data-action="delete-user" data-id="' + user.id + '" ' + (disabled ? "disabled" : "") + '>' + actionLabel + '</button></div>';
 }
 
 function renderReportsLegacy() {
@@ -544,7 +547,7 @@ function openDatabaseRow(table, id) {
   const rows = databaseSnapshot?.tables?.[table] || [];
   const record = rows.find(row => String(row.id ?? row.setting_key) === String(id));
   if (!record) return;
-  const excluded = ["id","created_at","updated_at","auto_unassigned_at"];
+  const excluded = ["id","setting_key","created_at","updated_at","auto_unassigned_at"];
   const fields = Object.entries(record).filter(([key]) => !excluded.includes(key));
   const formFields = fields.map(([key,value]) => '<label class="form-field"><span class="form-label">' + escapeHtml(key.replaceAll("_", " ")) + '</span><input class="form-control" name="' + escapeHtml(key) + '" value="' + escapeHtml(value ?? "") + '" /></label>').join("");
   openModal('<div class="modal-header"><div><h2 id="modal-title">Edit database record</h2><p>' + escapeHtml(table) + ' · ' + escapeHtml(id) + '</p></div><button class="modal-close" data-action="close-modal">×</button></div><form id="database-row-form"><div class="modal-body"><div class="form-grid">' + formFields + '</div></div><div class="modal-footer"><button type="button" class="button secondary" data-action="close-modal">Cancel</button><button type="submit" class="button">Save record</button></div></form>');
