@@ -56,6 +56,15 @@ Open `/public.html`. Visitors can review confirmed bookings by department and ti
 - **Admin:** Full workspace access, including account creation. The database page is read-only.
 - Each account can change its own password from **Settings → Account security**.
 
+## Vercel preview login
+
+For the browser-only Vercel preview, use one of these demo accounts:
+
+- Super Admin: `preview.superadmin@assembly.local` / `PreviewOnly2026!`
+- Admin: `preview.admin@assembly.local` / `PreviewAdmin2026!`
+
+These demo accounts work only after the `vercel-preview` branch has been deployed. They are separate from the SQLite server's Super Admin account.
+
 ## Deployment notes
 
 The Vercel preview is a static UI preview. Its demo data and demo accounts are stored in the current browser only; separate visitors do not share changes. Shared logins, public requests, and SQLite data require the Python server and a persistent database.
