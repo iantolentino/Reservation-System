@@ -68,9 +68,26 @@ const modalBackdrop = $("#modal-backdrop");
 const modal = $("#modal");
 
 function ensurePreviewAccounts() {
-  if (!localStorage.getItem("assembly-demo-users")) {
-    localStorage.setItem("assembly-demo-users", JSON.stringify([{ id: 1, name: "Preview Super Admin", email: "preview.superadmin@assembly.local", department: "Administration", role: "Super Admin", status: "Active", password: "PreviewOnly2026!" }]));
+  const seededAccounts = [
+    { id: 1, name: "Preview Super Admin", email: "preview.superadmin@assembly.local", department: "Administration", role: "Super Admin", status: "Active", password: "PreviewOnly2026!" },
+    { id: 2, name: "Preview Admin", email: "preview.admin@assembly.local", department: "Operations", role: "Admin", status: "Active", password: "PreviewAdmin2026!" }
+  ];
+  let accounts = [];
+  try { accounts = JSON.parse(localStorage.getItem("assembly-demo-users") || "[]"); } catch (_) {}
+  if (!Array.isArray(accounts)) accounts = [];
+
+  // One-time preview credential migration resets the two built-in demo accounts,
+  // while preserving any additional accounts created in this browser.
+  if (localStorage.getItem("assembly-demo-users-version") !== "2") {
+    const seededEmails = seededAccounts.map(account => account.email);
+    accounts = [...seededAccounts, ...accounts.filter(account => !seededEmails.includes(String(account.email).toLowerCase()))];
+    localStorage.setItem("assembly-demo-users-version", "2");
+  } else {
+    for (const account of seededAccounts) {
+      if (!accounts.some(existing => String(existing.email).toLowerCase() === account.email)) accounts.push(account);
+    }
   }
+  localStorage.setItem("assembly-demo-users", JSON.stringify(accounts));
 }
 
 function loadState() {
@@ -352,7 +369,7 @@ async function boot() {
     ensurePreviewAccounts();
     state = loadState();
     const hint = $(".login-hint");
-    if (hint) hint.innerHTML = "<strong>Vercel preview account</strong><span>preview.superadmin@assembly.local · PreviewOnly2026!</span>";
+    if (hint) hint.innerHTML = "<strong>Vercel preview accounts</strong><span>Super Admin: preview.superadmin@assembly.local · PreviewOnly2026!</span><span>Admin: preview.admin@assembly.local · PreviewAdmin2026!</span>";
     $("#login-email").value = "preview.superadmin@assembly.local";
     showLogin();
     return;
